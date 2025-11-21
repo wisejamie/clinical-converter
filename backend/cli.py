@@ -81,6 +81,12 @@ def run_cli():
         help="Show version"
     )
 
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Generate a clinical summary using the FHIR output."
+    )
+
     args = parser.parse_args()
 
     if args.version:
@@ -125,17 +131,17 @@ def run_cli():
 
     # === RAW MODE ===
     if args.raw:
-        output_obj = parsed
+        bundle = parsed
     else:
         # === FHIR CONVERSION ===
         try:
-            output_obj = convert_parsed_hl7_to_fhir(parsed, debug=args.debug)
+            bundle = convert_parsed_hl7_to_fhir(parsed, debug=args.debug)
         except Exception as e:
             print(colour_error(f"Failed to convert to FHIR: {e}"), file=sys.stderr)
             sys.exit(3)
 
     # === JSON OUTPUT ===
-    json_str = json.dumps(output_obj, indent=2 if args.pretty else None)
+    json_str = json.dumps(bundle, indent=2 if args.pretty else None)
 
     if args.output:
         try:
@@ -146,6 +152,13 @@ def run_cli():
             sys.exit(4)
     else:
         print(json_str)
+
+    # After bundle is printed/generated:
+    if args.summary:
+        from backend.summarize import summarize_fhir_bundle
+        print("\n===== CLINICAL SUMMARY =====\n")
+        summary = summarize_fhir_bundle(bundle, debug=args.debug)
+        print(summary)
 
 
 if __name__ == "__main__":

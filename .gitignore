@@ -26,3 +26,4 @@ env/
 # Temp files
 tmp/
 __pycache__/
+clinical_converter.egg-info/

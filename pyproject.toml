@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clinical-converter"
+version = "0.2.0"
+description = "HL7 → FHIR converter with validation and CLI"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+  {name="Jamie Wise", email="jamie@example.com"}
+]
+
+dependencies = [
+  "colorama",
+  "hl7apy",
+]
+
+[tool.setuptools]
+packages = ["backend"]
+
+[project.scripts]
+hl7-to-fhir = "backend.cli:run_cli"

@@ -4,24 +4,33 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from colorama import init, Fore, Style
 
-# Import backend converters
+# Initialize colorama for cross-platform colour output
+init(autoreset=True)
+
+# backend imports
 from backend.parse_hl7 import parse_hl7_file
 from backend.to_fhir import convert_parsed_hl7_to_fhir
+from backend.validate_hl7 import validate_hl7_lines
 
 
 def load_hl7_file(path: Path):
     if not path.exists():
         raise FileNotFoundError(f"Input file does not exist: {path}")
+    return path.read_text()
 
-    text = path.read_text()
-    return text
+
+def colour_error(msg):
+    return f"{Fore.RED}❌ {msg}{Style.RESET_ALL}"
+
+
+def colour_ok(msg):
+    return f"{Fore.GREEN}✔ {msg}{Style.RESET_ALL}"
 
 
 def run_cli():
-    parser = argparse.ArgumentParser(
-        description="HL7 → FHIR conversion tool"
-    )
+    parser = argparse.ArgumentParser(description="HL7 → FHIR conversion tool")
 
     parser.add_argument(
         "-i", "--input",
@@ -33,7 +42,7 @@ def run_cli():
     parser.add_argument(
         "-o", "--output",
         type=str,
-        help="Optional output file for FHIR JSON"
+        help="Optional output file"
     )
 
     parser.add_argument(
@@ -55,64 +64,85 @@ def run_cli():
     )
 
     parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Validate HL7 before converting"
+    )
+
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Validate HL7 and exit without converting"
+    )
+
+    parser.add_argument(
         "--version",
         action="store_true",
-        help="Show version and exit"
+        help="Show version"
     )
 
     args = parser.parse_args()
 
-    # Handle version flag
     if args.version:
-        print("hl7-to-fhir version 0.1.0")
+        print("hl7-to-fhir version 0.2.0")
         sys.exit(0)
 
     input_path = Path(args.input)
 
-    # === STEP 1 — Load HL7 File ===
+    # === LOAD HL7 ===
     try:
-        hl7_text = load_hl7_file(input_path)
+        hl7_raw = load_hl7_file(input_path)
     except Exception as e:
-        print(f"[ERROR] Cannot load input file: {e}", file=sys.stderr)
+        print(colour_error(f"Error loading HL7 file: {e}"), file=sys.stderr)
         sys.exit(1)
 
-    if args.debug:
-        print("====== DEBUG: Loading HL7 File ======")
-        print(hl7_text)
-        print("=====================================")
+    # Normalize lines for validation
+    normalized = hl7_raw.replace("\r\n", "\n").replace("\r", "\n").strip().split("\n")
 
-    # === STEP 2 — Parse HL7 ===
+    # === VALIDATION ===
+    if args.validate or args.validate_only:
+        errors = validate_hl7_lines(normalized)
+
+        if errors:
+            print(colour_error("HL7 Validation Failed:\n"))
+            for err in errors:
+                print(colour_error(f"  - {err}"))
+            print()
+            print(colour_error(f"Validation failed with {len(errors)} error(s)."))
+            sys.exit(5)
+        else:
+            print(colour_ok("HL7 validation passed."))
+
+        if args.validate_only:
+            sys.exit(0)
+
+    # === PARSE HL7 → Python dict ===
     try:
         parsed = parse_hl7_file(str(input_path), debug=args.debug)
     except Exception as e:
-        print(f"[ERROR] Failed to parse HL7: {e}", file=sys.stderr)
+        print(colour_error(f"Failed to parse HL7: {e}"), file=sys.stderr)
         sys.exit(2)
 
+    # === RAW MODE ===
     if args.raw:
-        output_json = parsed
+        output_obj = parsed
     else:
-        # === STEP 3 — Convert to FHIR ===
+        # === FHIR CONVERSION ===
         try:
-            fhir_bundle = convert_parsed_hl7_to_fhir(parsed, debug=args.debug)
-            output_json = fhir_bundle
+            output_obj = convert_parsed_hl7_to_fhir(parsed, debug=args.debug)
         except Exception as e:
-            print(f"[ERROR] Failed to convert to FHIR: {e}", file=sys.stderr)
+            print(colour_error(f"Failed to convert to FHIR: {e}"), file=sys.stderr)
             sys.exit(3)
 
-    # === STEP 4 — Format output ===
-    if args.pretty:
-        json_str = json.dumps(output_json, indent=2)
-    else:
-        json_str = json.dumps(output_json)
+    # === JSON OUTPUT ===
+    json_str = json.dumps(output_obj, indent=2 if args.pretty else None)
 
-    # === STEP 5 — Print or save ===
     if args.output:
         try:
             Path(args.output).write_text(json_str)
-            if args.debug:
-                print(f"[DEBUG] Output written to {args.output}")
+            print(colour_ok(f"Wrote output to {args.output}"))
         except Exception as e:
-            print(f"[ERROR] Failed to write output: {e}", file=sys.stderr)
+            print(colour_error(f"Failed to write output: {e}"), file=sys.stderr)
             sys.exit(4)
     else:
         print(json_str)

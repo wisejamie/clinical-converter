@@ -4,3 +4,4 @@ jsonschema
 pydantic
 openai
 pytest
+colorama

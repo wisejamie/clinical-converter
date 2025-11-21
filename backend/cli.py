@@ -82,9 +82,15 @@ def run_cli():
     )
 
     parser.add_argument(
-        "--summary",
+        "--summary-deterministic",
         action="store_true",
-        help="Generate a clinical summary using the FHIR output."
+        help="Generate a deterministic clinical summary."
+    )
+
+    parser.add_argument(
+        "--summary-llm",
+        action="store_true",
+        help="Generate a neutral human-readable summary using GPT."
     )
 
     args = parser.parse_args()
@@ -154,12 +160,17 @@ def run_cli():
         print(json_str)
 
     # After bundle is printed/generated:
-    if args.summary:
+    if args.summary_deterministic:
         from backend.summarize import summarize_fhir_bundle
         print("\n===== CLINICAL SUMMARY =====\n")
         summary = summarize_fhir_bundle(bundle, debug=args.debug)
         print(summary)
 
+    if args.summary_llm:
+        from backend.summarize import summarize_fhir_human
+        print("\n===== LLM SUMMARY =====\n")
+        summary = summarize_fhir_human(bundle, debug=args.debug)
+        print(summary)
 
 if __name__ == "__main__":
     run_cli()

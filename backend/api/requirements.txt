@@ -1,0 +1,14 @@
+# Dependencies from backend/requirements.txt
+hl7apy
+fhir.resources
+jsonschema
+pydantic
+openai
+pytest
+colorama
+dotenv
+
+# Additional API server dependencies
+fastapi
+uvicorn
+python-multipart

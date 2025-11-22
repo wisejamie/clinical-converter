@@ -49,14 +49,24 @@ def parse_hl7_file(path: str, debug: bool = False) -> dict:
             if debug:
                 print("[DEBUG] OBX parsed as:", obx)
 
+        elif seg == "PV1":
+            parsed["encounter"] = _parse_pv1(fields)
+
+        elif seg == "EVN":
+            parsed["event"] = _parse_evn(fields)
+
     if pid is None:
         raise ValueError("No PID segment found in HL7 message")
 
     parsed = {
-        "patient": pid,
-        "order": obr,
-        "observations": obxs,
+        "msh": None,
+        "pid": None,
+        "encounter": None,
+        "event": None,
+        "orders": [],
+        "observations": [],
     }
+
 
     if debug:
         print("\n[DEBUG] --- FINAL PARSED STRUCTURE ---")
@@ -165,6 +175,29 @@ def _parse_obx(fields: List[str]) -> Dict[str, Any]:
         "unit": unit,
         "ref_range": ref_range,
         "flag": flag,
+    }
+
+def _parse_pv1(fields: List[str]) -> Dict[str, Any]:
+    return {
+        "set_id": _safe_index(fields, 1),
+        "patient_class": _safe_index(fields, 2),          # I/O/E
+        "location": _safe_index(fields, 3),               # PV1-3 Assigned Patient Location
+        "attending_doctor": _safe_index(fields, 7),       # PV1-7
+        "hospital_service": _safe_index(fields, 10),      # PV1-10
+        "visit_number": _safe_index(fields, 19),          # PV1-19
+        "admit_time": _safe_index(fields, 44),            # PV1-44
+        "discharge_time": _safe_index(fields, 45),        # PV1-45
+    }
+
+def _parse_evn(fields: List[str]) -> Dict[str, Any]:
+    """
+    Parse EVN (Event Type) segment.
+    HL7: EVN|A03|20250101083000|...
+    """
+    return {
+        "event_type": _safe_index(fields, 1),             # EVN-1 e.g., A01, A03
+        "recorded_time": _safe_index(fields, 2),          # EVN-2 timestamp
+        "event_occurred_time": _safe_index(fields, 6),    # EVN-6
     }
 
 

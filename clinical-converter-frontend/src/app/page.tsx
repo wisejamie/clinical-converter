@@ -80,6 +80,27 @@ export default function HomePage() {
     }
   }
 
+  async function handleGenerate() {
+    setError(null);
+    try {
+      const res = await fetch(`${apiBase}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "adt_random", count: 1 }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || "Generation failed");
+      }
+
+      const data = await res.json();
+      setHl7Text(data.messages[0]);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
+
   async function handleLlmSummary() {
     setError(null);
     setIsSummarizing(true);
@@ -184,6 +205,12 @@ export default function HomePage() {
                   className="rounded-md border border-slate-600 px-3 py-1 text-xs hover:bg-slate-800"
                 >
                   Load sample ADT
+                </button>
+                <button
+                  onClick={handleGenerate}
+                  className="rounded-md border border-sky-500 px-3 py-1 text-xs hover:bg-sky-900"
+                >
+                  Generate random ADT
                 </button>
               </div>
             </div>

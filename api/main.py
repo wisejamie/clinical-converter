@@ -74,6 +74,23 @@ def llm_summary(data: FHIRBundleModel):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+from backend.hl7_generate import generate_hl7_message
+
+class GenerateRequest(BaseModel):
+    type: str = "adt_random"
+    count: int = 1
+
+@app.post("/generate")
+def generate_hl7(req: GenerateRequest):
+    try:
+        messages = []
+        for _ in range(req.count):
+            msg = generate_hl7_message(req.type)
+            messages.append(msg)
+        return {"messages": messages}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 # Dev server entrypoint
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

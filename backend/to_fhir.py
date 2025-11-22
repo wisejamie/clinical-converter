@@ -42,13 +42,10 @@ def convert_parsed_hl7_to_fhir(parsed: dict, debug: bool = False) -> dict:
             debug=debug
         )
 
+
+    encounter_id = encounter_fhir["id"] if encounter_fhir else None
     obs_fhir = [
-        obx_to_fhir(
-            o,
-            patient_fhir["id"],
-            encounter_fhir["id"] if encounter_fhir else None,
-            debug=debug
-        )
+        obx_to_fhir(o, patient_fhir["id"], encounter_id)
         for o in parsed["observations"]
     ]
 

@@ -20,9 +20,18 @@ def parse_hl7_file(path: str, debug: bool = False) -> dict:
         for line in lines:
             print("  ", repr(line))
 
-    pid = None
+    # Track first OBR (order) if present
     obr = None
-    obxs: List[Dict[str, Any]] = []
+
+    parsed = {
+        "msh": None,
+        "patient": None,
+        "encounter": None,
+        "event": None,
+        "orders": [],
+        "observations": []
+    }
+
 
     for line in lines:
         if not line.strip():
@@ -34,18 +43,19 @@ def parse_hl7_file(path: str, debug: bool = False) -> dict:
             print(f"\n[DEBUG] Processing segment: {seg}")
 
         if seg == "PID":
-            pid = _parse_pid(fields)
+            parsed["patient"] = _parse_pid(fields)
             if debug:
-                print("[DEBUG] PID parsed as:", pid)
+                print("[DEBUG] PID parsed as:", parsed["patient"])
 
         elif seg == "OBR" and obr is None:
             obr = _parse_obr(fields)
+            parsed["orders"].append(obr)
             if debug:
                 print("[DEBUG] OBR parsed as:", obr)
 
         elif seg == "OBX":
             obx = _parse_obx(fields)
-            obxs.append(obx)
+            parsed["observations"].append(obx)
             if debug:
                 print("[DEBUG] OBX parsed as:", obx)
 
@@ -55,18 +65,8 @@ def parse_hl7_file(path: str, debug: bool = False) -> dict:
         elif seg == "EVN":
             parsed["event"] = _parse_evn(fields)
 
-    if pid is None:
+    if parsed["patient"] is None:
         raise ValueError("No PID segment found in HL7 message")
-
-    parsed = {
-        "msh": None,
-        "pid": None,
-        "encounter": None,
-        "event": None,
-        "orders": [],
-        "observations": [],
-    }
-
 
     if debug:
         print("\n[DEBUG] --- FINAL PARSED STRUCTURE ---")
@@ -178,15 +178,25 @@ def _parse_obx(fields: List[str]) -> Dict[str, Any]:
     }
 
 def _parse_pv1(fields: List[str]) -> Dict[str, Any]:
+    # Get last two non-empty fields (admit/discharge)
+    nonempty = [f for f in fields if f not in ("", None)]
+
+    admit = None
+    discharge = None
+
+    if len(nonempty) >= 2:
+        admit = nonempty[-2]
+        discharge = nonempty[-1]
+
     return {
         "set_id": _safe_index(fields, 1),
-        "patient_class": _safe_index(fields, 2),          # I/O/E
-        "location": _safe_index(fields, 3),               # PV1-3 Assigned Patient Location
-        "attending_doctor": _safe_index(fields, 7),       # PV1-7
-        "hospital_service": _safe_index(fields, 10),      # PV1-10
-        "visit_number": _safe_index(fields, 19),          # PV1-19
-        "admit_time": _safe_index(fields, 44),            # PV1-44
-        "discharge_time": _safe_index(fields, 45),        # PV1-45
+        "patient_class": _safe_index(fields, 2),
+        "location": _safe_index(fields, 3),
+        "attending_doctor": _safe_index(fields, 7),
+        "hospital_service": _safe_index(fields, 10),
+        "visit_number": _safe_index(fields, 18),
+        "admit_time": admit,
+        "discharge_time": discharge,
     }
 
 def _parse_evn(fields: List[str]) -> Dict[str, Any]:

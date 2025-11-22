@@ -261,3 +261,14 @@ def generate_random_adt() -> str:
     """
     trigger = random.choice(["A01", "A03", "A04"])
     return generate_adt(trigger=trigger)
+
+def generate_hl7_message(message_type: str = "adt_random") -> str:
+    """
+    Unified entry point for HL7 generation used by the API.
+    """
+    if message_type == "adt_random":
+        return generate_random_adt()
+    if message_type in ("A01", "A03", "A04"):
+        return generate_adt(trigger=message_type)
+
+    raise ValueError(f"Unsupported message_type: {message_type}")

@@ -2,6 +2,14 @@
 
 Clinical Converter converts HL7 v2 messages (the legacy hospital messaging format) into modern FHIR JSON and produces simple summaries so the information is easy for humans to read.
 
+### ▶️ Live Demo
+
+https://clinical-converter-frontend-f4trc9hum-wisejamies-projects.vercel.app/
+
+The frontend is deployed on **Vercel**, connecting to the backend FastAPI service deployed on **Render**.
+
+**Note**: The backend is hosted on Render’s free tier, so it may take 30–60 seconds to wake up on the first request.
+
 ## Why this project exists
 
 A huge amount of healthcare data still moves through **HL7 v2**, a messaging standard from the 1980s. It works, but it’s messy: every vendor structures it differently, it’s hard to validate, and it doesn’t translate cleanly into modern systems.
@@ -31,6 +39,8 @@ ADT (Admit, Discharge and Transfer) and basic lab messages:
 - **PID** — patient demographics
 - **PV1** — encounter details (location, attending doctor, class, etc.)
 - **EVN** — event metadata (message type, timestamps)
+- **NK1** — next-of-kin / related persons
+- **AL1** — allergies
 - **OBR** — order information
 - **OBX** — observations (numeric or text)
 - **MSH** — message header (used to detect message type)
@@ -61,32 +71,48 @@ checks to help catch malformed files.
 
 The converter builds a FHIR R4 Bundle containing:
 
-#### Patient
+#### **Patient**
 
 - MRN
 - Name
 - Birth date
 - Gender
 
-#### Encounter
+#### **Encounter**
 
-- Encounter class (inpatient, outpatient, etc.)
-- Event type (A01, A04, etc.)
-- Location (from PV1)
+- Encounter class
+- Event type
+- Location
 - Attending clinician
-- Start and end timestamps
-- Link back to the Patient
+- Start/end timestamps
+- Linked to the Patient
 
-#### Observations
+#### **Observations (OBX)**
 
-Each OBX segment becomes a FHIR Observation with:
+Each OBX becomes an Observation with:
 
-- Code and display
-- Numeric or text value
+- Code + display
+- Text or numeric value
 - Units
 - Reference ranges
 - Abnormal flags
-- Links to the Patient and Encounter
+- Linked to Patient and Encounter
+
+#### **Related Persons (NK1)**
+
+Mapped to **FHIR RelatedPerson**, including:
+
+- Name
+- Relationship (e.g., SPO, MTH)
+- Contact details
+
+#### **Allergies (AL1)**
+
+Mapped to **FHIR AllergyIntolerance**, including:
+
+- Substance
+- Reaction
+- Severity (expanded: Mild, Moderate, Severe)
 
 The output Bundle is simple and easy to inspect.
 
@@ -99,7 +125,9 @@ It includes:
 
 - Patient information
 - Encounter information
-- All observations with values, units, and flags
+- Observations
+- Related persons
+- Allergies
 
 This summary contains only the facts that appear in the message.  
 It avoids interpretation and avoids adding anything new.

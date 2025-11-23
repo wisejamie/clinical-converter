@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 type ParsedType = any;
 type FhirBundle = any;
@@ -31,6 +31,7 @@ type Tab = (typeof TABS)[number];
 
 export default function HomePage() {
   const [hl7Text, setHl7Text] = useState(SAMPLE_HL7);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("Deterministic Summary");
   const [parsed, setParsed] = useState<ParsedType | null>(null);
   const [fhir, setFhir] = useState<FhirBundle | null>(null);
@@ -193,6 +194,19 @@ export default function HomePage() {
     }
   }
 
+  // Auto-grow HL7 textarea up to 480px
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+
+    // Reset height first to measure scrollHeight accurately
+    el.style.height = "auto";
+
+    // Cap at 480px
+    const newHeight = Math.min(el.scrollHeight, 480);
+    el.style.height = `${newHeight}px`;
+  }, [hl7Text]);
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 text-base">
       <div className="mx-auto max-w-6xl px-4 py-10">
@@ -200,10 +214,22 @@ export default function HomePage() {
           <h1 className="text-3xl font-semibold tracking-tight mb-2">
             Clinical Converter – HL7 → FHIR Demo
           </h1>
-          <p className="text-sm text-slate-300 max-w-2xl">
-            Paste or edit an HL7 v2 message on the left, then convert it into a
-            FHIR R4 Bundle and view deterministic and LLM-generated summaries.
-            Backed by a FastAPI service running on Render.
+          <p className="text-base text-slate-300 max-w-6xl">
+            HL7 v2 is the legacy messaging format used by most hospitals, while
+            FHIR is the modern JSON standard that powers today’s digital health
+            apps. This demo shows how a raw HL7 message can be parsed,
+            validated, converted into a FHIR R4 Bundle, and turned into simple
+            human-readable summaries.
+            <br />
+            <br />
+            To try it out: generate a sample ADT message or paste your own HL7
+            on the left, click <strong>Convert to FHIR</strong>, and then
+            optionally generate an
+            <strong> LLM Summary</strong>.
+            <br />
+            <br />
+            (Note: the backend is hosted on Render’s free tier, so it may take
+            30–60 seconds to wake up on the first request.)
           </p>
         </header>
 
@@ -244,7 +270,8 @@ export default function HomePage() {
               </div>
             </div>
             <textarea
-              className="h-[340px] w-full resize-none rounded-lg border border-slate-700 bg-slate-900/70 p-3 text-base font-mono text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              ref={textareaRef}
+              className="min-h-[360px] max-h-[480px] w-full resize-y rounded-lg border border-slate-700 bg-slate-900/70 p-3 text-base font-mono text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
               value={hl7Text}
               onChange={(e) => setHl7Text(e.target.value)}
               spellCheck={false}
@@ -308,9 +335,21 @@ export default function HomePage() {
           </section>
         </div>
 
-        <footer className="mt-10 text-xs text-slate-500">
-          Backend: <code>FastAPI</code> on Render · Frontend:{" "}
-          <code>Next.js + Tailwind</code> on Vercel
+        <footer className="mt-10 text-xs text-slate-500 flex flex-col gap-1">
+          <span>
+            Backend: <code>FastAPI</code> on Render · Frontend:{" "}
+            <code>Next.js + Tailwind</code> on Vercel
+          </span>
+          <span>
+            Built by{" "}
+            <a
+              href="https://github.com/wisejamie/clinical-converter"
+              target="_blank"
+              className="underline hover:text-slate-300"
+            >
+              Jamie Wise
+            </a>
+          </span>
         </footer>
       </div>
     </main>

@@ -4,7 +4,7 @@ Clinical Converter converts HL7 v2 messages (the legacy hospital messaging forma
 
 ### ▶️ Live Demo
 
-https://clinical-converter-frontend-f4trc9hum-wisejamies-projects.vercel.app/
+https://clinical-converter-frontend.vercel.app/
 
 The frontend is deployed on **Vercel**, connecting to the backend FastAPI service deployed on **Render**.
 

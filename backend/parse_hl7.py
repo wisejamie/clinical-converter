@@ -29,7 +29,9 @@ def parse_hl7_file(path: str, debug: bool = False) -> dict:
         "encounter": None,
         "event": None,
         "orders": [],
-        "observations": []
+        "observations": [],
+        "related_persons": [],
+        "allergies": []
     }
 
 
@@ -64,6 +66,18 @@ def parse_hl7_file(path: str, debug: bool = False) -> dict:
 
         elif seg == "EVN":
             parsed["event"] = _parse_evn(fields)
+
+        elif seg == "NK1":
+            nk1 = _parse_nk1(fields)
+            parsed["related_persons"].append(nk1)
+            if debug:
+                print("[DEBUG] NK1 parsed as:", nk1)
+
+        elif seg == "AL1":
+            al1 = _parse_al1(fields)
+            parsed["allergies"].append(al1)
+            if debug:
+                print("[DEBUG] AL1 parsed as:", al1)
 
     if parsed["patient"] is None:
         raise ValueError("No PID segment found in HL7 message")
@@ -210,6 +224,59 @@ def _parse_evn(fields: List[str]) -> Dict[str, Any]:
         "event_occurred_time": _safe_index(fields, 6),    # EVN-6
     }
 
+
+def _parse_nk1(fields: List[str]) -> Dict[str, Any]:
+    """
+    NK1|1|Doe^Jane|SPO^Spouse||5145551212
+    """
+    name = _safe_index(fields, 2)
+    relationship = _safe_index(fields, 3)
+    phone = _safe_index(fields, 5)
+
+    # Split name if possible
+    family, given = None, None
+    if name:
+        parts = name.split("^")
+        family = parts[0] if len(parts) > 0 else None
+        given = parts[1] if len(parts) > 1 else None
+
+    return {
+        "name_raw": name,
+        "family": family,
+        "given": given,
+        "relationship_raw": relationship,
+        "relationship_code": relationship.split("^")[0] if relationship else None,
+        "phone": phone
+    }
+
+
+def _parse_al1(fields: List[str]) -> Dict[str, Any]:
+    """
+    AL1|1||^Peanut Allergy|SV|Hives|Mild
+    """
+    allergy_code = _safe_index(fields, 3)
+    description = _safe_index(fields, 4)
+    severity_raw = _safe_index(fields, 5)
+    reaction = _safe_index(fields, 6)
+    severity_final = None
+
+    # Normalize severity
+    # HL7 uses: SV=severe, MI=mild, MO=moderate (vendor-dependent)
+    if severity_raw:
+        # Try to map common abbreviations
+        mapping = {
+            "SV": "severe",
+            "MO": "moderate",
+            "MI": "mild",
+        }
+        severity_final = mapping.get(severity_raw, severity_raw.lower())
+
+    return {
+        "code_raw": allergy_code,
+        "description": description,
+        "reaction": reaction,
+        "severity": severity_final
+    }
 
 # -------------------------------------------------
 # Helpers

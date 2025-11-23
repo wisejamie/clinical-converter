@@ -234,11 +234,16 @@ def summarize_fhir_bundle(bundle: dict, debug: bool = False) -> str:
         lines.append("Related Persons:")
         lines.extend(related_lines)
 
+    # Allergies
+    SEVERITY_MAP = {
+            "MI": "Mild",
+            "MO": "Moderate",
+            "SV": "Severe",
+        }
+    
     allergy_lines = []
     for allergy in allergies:
         substance = None
-
-        # --- FIRST: use code.text if present ---
         code = allergy.get("code", {})
         if isinstance(code, dict):
             if code.get("text"):
@@ -249,23 +254,36 @@ def summarize_fhir_bundle(bundle: dict, debug: bool = False) -> str:
                 coding = code["coding"][0]
                 substance = coding.get("display") or coding.get("code")
 
-        # clinicalStatus is optional
-        clinical_status = None
-        if "clinicalStatus" in allergy:
-            cs_coding = allergy["clinicalStatus"].get("coding") or []
-            if cs_coding:
-                clinical_status = cs_coding[0].get("code")
+        # Reaction & severity
+        reaction = None
+        if "reaction" in allergy and allergy["reaction"]:
+            r = allergy["reaction"][0]  # only one reaction entry expected
+            reaction = r.get("description")
 
-        allergy_lines.append(
-            f"- {substance or 'Unknown substance'}"
-            f"{f' (status: {clinical_status})' if clinical_status else ''}"
-        )
+        severity_raw = None
+        severity_expanded = None
+        if "reaction" in allergy and allergy["reaction"]:
+            r = allergy["reaction"][0]
+            severity_raw = r.get("severity")
+            severity_expanded = SEVERITY_MAP.get(severity_raw, None)
+
+        line = f"- {substance or 'Unknown substance'}"
+
+        if reaction:
+            line += f", reaction: {reaction}"
+
+        if severity_raw:
+            if severity_expanded:
+                line += f", severity: {severity_expanded} ({severity_raw})"
+            else:
+                line += f", severity: {severity_raw}"
+
+        allergy_lines.append(line)
 
     if allergy_lines:
         lines.append("")
         lines.append("Allergies:")
         lines.extend(allergy_lines)
-
 
     # Make it explicit that this contains no clinical interpretation
     lines.append("")

@@ -142,6 +142,20 @@ export default function HomePage() {
     setHl7Text(SAMPLE_HL7);
   }
 
+  function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result;
+      if (typeof text === "string") {
+        setHl7Text(text);
+      }
+    };
+    reader.readAsText(file);
+  }
+
   function renderTabContent() {
     switch (activeTab) {
       case "Parsed HL7":
@@ -199,6 +213,21 @@ export default function HomePage() {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-medium">HL7 Input</h2>
               <div className="flex gap-2">
+                <input
+                  type="file"
+                  accept=".hl7,.txt"
+                  onChange={handleUpload}
+                  className="hidden"
+                  id="hl7-upload-input"
+                />
+
+                <label
+                  htmlFor="hl7-upload-input"
+                  className="rounded-md border border-slate-600 px-3 py-1 text-xs cursor-pointer hover:bg-slate-800"
+                >
+                  Upload HL7
+                </label>
+
                 <button
                   type="button"
                   onClick={handleLoadSample}
@@ -302,18 +331,43 @@ function JsonCard({ title, data, placeholder }: JsonCardProps) {
     navigator.clipboard.writeText(pretty).catch(() => {});
   };
 
+  function downloadJson(name: string, data: any) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${name.replace(/\s+/g, "_").toLowerCase()}.json`;
+    link.click();
+
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <span className="font-medium text-slate-200">{title}</span>
-        <button
-          type="button"
-          onClick={handleCopy}
-          disabled={!pretty}
-          className="rounded-md border border-slate-600 px-2 py-1 text-[10px] text-slate-200 hover:bg-slate-800 disabled:opacity-40"
-        >
-          Copy JSON
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleCopy}
+            disabled={!pretty}
+            className="rounded-md border border-slate-600 px-2 py-1 text-[10px] text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+          >
+            Copy JSON
+          </button>
+
+          <button
+            type="button"
+            onClick={() => downloadJson(title, data)}
+            disabled={!pretty}
+            className="rounded-md border border-sky-500 px-2 py-1 text-[10px] text-sky-200 hover:bg-sky-900 disabled:opacity-40"
+          >
+            Download JSON
+          </button>
+        </div>
       </div>
       <pre className="max-h-[280px] overflow-auto rounded-md bg-slate-950/80 p-2 text-[11px] leading-snug text-slate-100">
         {pretty || placeholder}

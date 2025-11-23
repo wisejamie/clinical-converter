@@ -249,34 +249,36 @@ def _parse_nk1(fields: List[str]) -> Dict[str, Any]:
         "phone": phone
     }
 
+def _parse_al1(fields):
+    # AL1-3 is usually coded, AL1-4 often contains ^Description
+    # HL7 is inconsistent, so we check both positions.
 
-def _parse_al1(fields: List[str]) -> Dict[str, Any]:
-    """
-    AL1|1||^Peanut Allergy|SV|Hives|Mild
-    """
-    allergy_code = _safe_index(fields, 3)
-    description = _safe_index(fields, 4)
-    severity_raw = _safe_index(fields, 5)
-    reaction = _safe_index(fields, 6)
-    severity_final = None
+    # Extract description from AL1-3 (fields[2]) or AL1-4 (fields[3])
+    description = None
 
-    # Normalize severity
-    # HL7 uses: SV=severe, MI=mild, MO=moderate (vendor-dependent)
-    if severity_raw:
-        # Try to map common abbreviations
-        mapping = {
-            "SV": "severe",
-            "MO": "moderate",
-            "MI": "mild",
-        }
-        severity_final = mapping.get(severity_raw, severity_raw.lower())
+    # Try AL1-3 CE format
+    if len(fields) > 3 and fields[3]:
+        parts = fields[3].split("^")
+        if len(parts) > 1 and parts[1].strip():
+            description = parts[1].strip()
+
+    # Fallback: sometimes the description is directly in AL1-3
+    if (not description) and len(fields) > 3:
+        if fields[3].strip():
+            description = fields[3].strip()
+
+    # Reaction is AL1-5
+    reaction = fields[5].strip() if len(fields) > 5 else None
+
+    # Severity (AL1-4) is a coded value (MI/MO/SV)
+    severity = fields[4].strip() if len(fields) > 4 else None
 
     return {
-        "code_raw": allergy_code,
-        "description": description,
-        "reaction": reaction,
-        "severity": severity_final
+        "description": description or "Unknown",
+        "reaction": reaction or None,
+        "severity": severity or None,
     }
+
 
 # -------------------------------------------------
 # Helpers

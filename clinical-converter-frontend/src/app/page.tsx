@@ -194,7 +194,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
+    <main className="min-h-screen bg-slate-950 text-slate-100 text-base">
       <div className="mx-auto max-w-6xl px-4 py-10">
         <header className="mb-8">
           <h1 className="text-3xl font-semibold tracking-tight mb-2">
@@ -244,7 +244,7 @@ export default function HomePage() {
               </div>
             </div>
             <textarea
-              className="h-[340px] w-full resize-none rounded-lg border border-slate-700 bg-slate-900/70 p-3 text-sm font-mono text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="h-[340px] w-full resize-none rounded-lg border border-slate-700 bg-slate-900/70 p-3 text-base font-mono text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
               value={hl7Text}
               onChange={(e) => setHl7Text(e.target.value)}
               spellCheck={false}
@@ -286,7 +286,7 @@ export default function HomePage() {
             </div>
 
             <div className="rounded-lg border border-slate-800 bg-slate-900/70">
-              <div className="flex border-b border-slate-800 text-xs">
+              <div className="flex border-b border-slate-800 text-sm">
                 {TABS.map((tab) => (
                   <button
                     key={tab}
@@ -303,7 +303,7 @@ export default function HomePage() {
                 ))}
               </div>
 
-              <div className="p-3 text-xs">{renderTabContent()}</div>
+              <div className="p-3 text-sm">{renderTabContent()}</div>
             </div>
           </section>
         </div>
@@ -369,7 +369,7 @@ function JsonCard({ title, data, placeholder }: JsonCardProps) {
           </button>
         </div>
       </div>
-      <pre className="max-h-[280px] overflow-auto rounded-md bg-slate-950/80 p-2 text-[11px] leading-snug text-slate-100">
+      <pre className="max-h-[280px] overflow-auto rounded-md bg-slate-950/80 p-2 text-sm leading-normal text-slate-100">
         {pretty || placeholder}
       </pre>
     </div>
@@ -401,7 +401,7 @@ function TextCard({ title, text, placeholder }: TextCardProps) {
           Copy text
         </button>
       </div>
-      <div className="max-h-[280px] overflow-auto rounded-md bg-slate-950/80 p-3 text-[11px] leading-snug text-slate-100 whitespace-pre-wrap">
+      <div className="max-h-[280px] overflow-auto rounded-md bg-slate-950/80 p-3 text-sm leading-normal text-slate-100 whitespace-pre-wrap">
         {text || placeholder}
       </div>
     </div>

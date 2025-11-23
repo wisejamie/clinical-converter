@@ -41,6 +41,49 @@ PHYSICIANS = [
 FACILITIES = ["GeneralHospital", "CityHospital", "CommunityClinic"]
 APPS = ["ClinicEMR", "InpatientSys", "EDReg"]
 
+LAB_PANELS = [
+    {
+        "code": "DIABPANEL",
+        "text": "Diabetes panel",
+        "tests": [
+            {
+                "code": "2345-7",
+                "text": "Glucose",
+                "unit": "mmol/L",
+                "low": 3.6,
+                "high": 7.7,
+            },
+            {
+                "code": "4548-4",
+                "text": "Hemoglobin A1c",
+                "unit": "%",
+                "low": 4.0,
+                "high": 5.6,
+            },
+        ],
+    },
+    {
+        "code": "CBC",
+        "text": "Complete blood count",
+        "tests": [
+            {
+                "code": "6690-2",
+                "text": "WBC",
+                "unit": "10^9/L",
+                "low": 4.0,
+                "high": 11.0,
+            },
+            {
+                "code": "789-8",
+                "text": "Hemoglobin",
+                "unit": "g/L",
+                "low": 120.0,
+                "high": 150.0,
+            },
+        ],
+    },
+]
+
 
 def _random_date(start_year: int = 1940, end_year: int = 2025) -> datetime.date:
     """Random date between start_year and end_year."""
@@ -227,10 +270,94 @@ def _build_pv1(trigger: str) -> str:
     ]
     return "|".join(fields)
 
+def _random_value_in_range(low: float, high: float, allow_abnormal: bool = True) -> tuple[float, str]:
+    """
+    Pick a random value around the reference range.
+    Sometimes push slightly outside to generate H/L flags.
+    Returns (value, flag) where flag is '', 'H', or 'L'.
+    """
+    # 70% chance normal, 30% chance abnormal
+    if allow_abnormal and random.random() < 0.3:
+        # Decide high or low
+        if random.random() < 0.5:
+            # Slightly low
+            value = low - (low - 0) * 0.1 if low > 0 else low - 0.5
+            flag = "L"
+        else:
+            # Slightly high
+            span = high - low if high > low else 1.0
+            value = high + span * 0.1
+            flag = "H"
+    else:
+        # Normal value in range
+        value = random.uniform(low, high)
+        flag = ""
+
+    return value, flag
+
+
+def _build_obr_for_panel(panel: dict) -> str:
+    """
+    Build a simple OBR segment that represents the entire lab panel.
+    We reuse the same physician pool as for PV1.
+    """
+    ordering_provider = random.choice(PHYSICIANS)
+    # OBR-4: universal service identifier → PANELCODE^Panel text
+    id_field = f"{panel['code']}^{panel['text']}"
+    fields = [
+        "OBR",
+        "1",           # Set ID
+        "",            # Placer order number
+        "",            # Filler order number
+        id_field,      # Test code/name
+        "",            # OBR-5
+        "",            # OBR-6
+        "",            # OBR-7
+        "",            # OBR-8
+        "",            # OBR-9
+        "",            # OBR-10
+        "",            # OBR-11
+        "",            # OBR-12
+        ordering_provider,  # OBR-13 ordering provider
+    ]
+    return "|".join(fields)
+
+
+def _build_obx_for_panel_tests(panel: dict) -> list[str]:
+    """
+    Given a panel definition, build a list of OBX strings.
+    Each test is one OBX segment.
+    """
+    obx_segments: list[str] = []
+    set_id = 1
+
+    for test in panel["tests"]:
+        value, flag = _random_value_in_range(test["low"], test["high"])
+        range_str = f"{test['low']}-{test['high']}"
+
+        id_field = f"{test['code']}^{test['text']}^LN"
+        fields = [
+            "OBX",
+            str(set_id),
+            "NM",                  # Numeric value
+            id_field,              # OBX-3: code^text^coding system
+            "",                    # OBX-4
+            f"{value:.1f}",        # OBX-5: value
+            test["unit"],          # OBX-6: units
+            range_str,             # OBX-7: reference range
+            flag,                  # OBX-8: abnormal flag (H/L or empty)
+        ]
+        obx_segments.append("|".join(fields))
+        set_id += 1
+
+    return obx_segments
+
+
 
 def generate_adt(
     trigger: Literal["A01", "A03", "A04"] = "A01",
     include_nk1: bool = True,
+    include_labs: bool = True,
 ) -> str:
     """
     Generate a single HL7 ADT message with the given trigger event.
@@ -250,17 +377,25 @@ def generate_adt(
     pv1 = _build_pv1(trigger)
     segments.append(pv1)
 
+    if include_labs and LAB_PANELS:
+        panel = random.choice(LAB_PANELS)
+        obr = _build_obr_for_panel(panel)
+        obxs = _build_obx_for_panel_tests(panel)
+        segments.append(obr)
+        segments.extend(obxs)
+
     # HL7 segments are delimited by \r (carriage return)
     hl7_message = "\r".join(segments) + "\r"
     return hl7_message
 
 
-def generate_random_adt() -> str:
+def generate_random_adt(include_labs: bool = True) -> str:
     """
     Pick a random ADT trigger type (A01, A03, A04).
+    Optionally include lab panels.
     """
     trigger = random.choice(["A01", "A03", "A04"])
-    return generate_adt(trigger=trigger)
+    return generate_adt(trigger=trigger, include_labs=include_labs)
 
 def generate_hl7_message(message_type: str = "adt_random") -> str:
     """

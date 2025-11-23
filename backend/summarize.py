@@ -237,23 +237,35 @@ def summarize_fhir_bundle(bundle: dict, debug: bool = False) -> str:
     allergy_lines = []
     for allergy in allergies:
         substance = None
-        if "code" in allergy:
-            coding = (allergy["code"].get("coding") or [])
-            if coding:
-                substance = coding[0].get("display") or coding[0].get("code")
+
+        # --- FIRST: use code.text if present ---
+        code = allergy.get("code", {})
+        if isinstance(code, dict):
+            if code.get("text"):
+                substance = code["text"]
+
+            # --- THEN fall back to coding[].display or coding[].code ---
+            elif isinstance(code.get("coding"), list) and code["coding"]:
+                coding = code["coding"][0]
+                substance = coding.get("display") or coding.get("code")
+
+        # clinicalStatus is optional
         clinical_status = None
         if "clinicalStatus" in allergy:
-            cs_coding = (allergy["clinicalStatus"].get("coding") or [])
+            cs_coding = allergy["clinicalStatus"].get("coding") or []
             if cs_coding:
                 clinical_status = cs_coding[0].get("code")
+
         allergy_lines.append(
             f"- {substance or 'Unknown substance'}"
             f"{f' (status: {clinical_status})' if clinical_status else ''}"
         )
+
     if allergy_lines:
         lines.append("")
         lines.append("Allergies:")
         lines.extend(allergy_lines)
+
 
     # Make it explicit that this contains no clinical interpretation
     lines.append("")

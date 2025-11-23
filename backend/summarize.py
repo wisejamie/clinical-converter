@@ -16,6 +16,8 @@ def _extract_resources(bundle: dict) -> Tuple[Optional[dict], Optional[dict], Li
     patient = None
     encounter = None
     observations: List[dict] = []
+    related_persons = []
+    allergies = []
 
     for entry in bundle.get("entry", []):
         res = entry.get("resource") or {}
@@ -26,8 +28,12 @@ def _extract_resources(bundle: dict) -> Tuple[Optional[dict], Optional[dict], Li
             encounter = res
         elif rtype == "Observation":
             observations.append(res)
+        elif rtype == "RelatedPerson":
+            related_persons.append(res)
+        elif rtype == "AllergyIntolerance":
+            allergies.append(res)
 
-    return patient, encounter, observations
+    return patient, encounter, observations, related_persons, allergies
 
 
 def _format_patient(patient: dict) -> str:
@@ -176,7 +182,7 @@ def summarize_fhir_bundle(bundle: dict, debug: bool = False) -> str:
         print("\n[DEBUG] summarize_fhir_bundle() called with FHIR bundle:")
         print(json.dumps(bundle, indent=2))
 
-    patient, encounter, observations = _extract_resources(bundle)
+    patient, encounter, observations, related, allergies = _extract_resources(bundle)
 
     patient_line = _format_patient(patient)
     encounter_line = _format_encounter(encounter)
@@ -196,6 +202,58 @@ def summarize_fhir_bundle(bundle: dict, debug: bool = False) -> str:
         lines.extend(obs_lines)
     else:
         lines.append("- (no observations found)")
+
+    related_lines = []
+    for rp in related:
+        name = None
+        if "name" in rp and rp["name"]:
+            part = rp["name"][0]
+            if "family" in part or "given" in part:
+                family = part.get("family", "")
+                given = " ".join(part.get("given", []))
+                name = f"{given} {family}".strip()
+            else:
+                name = part.get("text")
+        rel = None
+        if "relationship" in rp and rp["relationship"]:
+            rc = rp["relationship"][0].get("coding", [])
+            if rc:
+                rel = rc[0].get("code")
+        phone = None
+        if "telecom" in rp and rp["telecom"]:
+            phone = rp["telecom"][0].get("value")
+
+        related_lines.append(
+            f"- {name or 'Unknown'}"
+            f"{f' ({rel})' if rel else ''}"
+            f"{f', phone: {phone}' if phone else ''}"
+        )
+
+    if related_lines:
+        lines.append("")
+        lines.append("Related Persons:")
+        lines.extend(related_lines)
+
+    allergy_lines = []
+    for allergy in allergies:
+        substance = None
+        if "code" in allergy:
+            coding = (allergy["code"].get("coding") or [])
+            if coding:
+                substance = coding[0].get("display") or coding[0].get("code")
+        clinical_status = None
+        if "clinicalStatus" in allergy:
+            cs_coding = (allergy["clinicalStatus"].get("coding") or [])
+            if cs_coding:
+                clinical_status = cs_coding[0].get("code")
+        allergy_lines.append(
+            f"- {substance or 'Unknown substance'}"
+            f"{f' (status: {clinical_status})' if clinical_status else ''}"
+        )
+    if allergy_lines:
+        lines.append("")
+        lines.append("Allergies:")
+        lines.extend(allergy_lines)
 
     # Make it explicit that this contains no clinical interpretation
     lines.append("")

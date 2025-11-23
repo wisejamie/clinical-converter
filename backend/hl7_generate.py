@@ -84,6 +84,28 @@ LAB_PANELS = [
     },
 ]
 
+ALLERGY_DESCRIPTIONS = [
+    "Peanut Allergy",
+    "Penicillin Allergy",
+    "Latex Allergy",
+    "Egg Allergy",
+    "Shellfish Allergy",
+]
+
+ALLERGY_REACTIONS = [
+    "Hives",
+    "Rash",
+    "Shortness of breath",
+    "Anaphylaxis",
+    "Swelling",
+]
+
+ALLERGY_SEVERITIES = [
+    "MI",  # mild
+    "MO",  # moderate
+    "SV",  # severe
+]
+
 
 def _random_date(start_year: int = 1940, end_year: int = 2025) -> datetime.date:
     """Random date between start_year and end_year."""
@@ -270,6 +292,29 @@ def _build_pv1(trigger: str) -> str:
     ]
     return "|".join(fields)
 
+def _build_al1(idx: int = 1) -> str:
+    """
+    Build AL1 (allergy) segment.
+    AL1|1||^Peanut Allergy|MI|Hives|Mild
+    """
+    description = random.choice(ALLERGY_DESCRIPTIONS)
+    reaction = random.choice(ALLERGY_REACTIONS)
+    severity_code = random.choice(ALLERGY_SEVERITIES)
+
+    # Map severity code → readable
+    severity_map = {"MI": "Mild", "MO": "Moderate", "SV": "Severe"}
+    severity_text = severity_map.get(severity_code, "")
+
+    return "|".join([
+        "AL1",
+        str(idx),
+        "",
+        f"^{description}",   # AL1-3
+        severity_code,       # AL1-4
+        reaction,            # AL1-5
+        severity_text,       # AL1-6
+    ])
+
 def _random_value_in_range(low: float, high: float, allow_abnormal: bool = True) -> tuple[float, str]:
     """
     Pick a random value around the reference range.
@@ -371,8 +416,16 @@ def generate_adt(
     pid = _build_pid(patient)
     segments = [msh, evn, pid]
 
+    # Often include 1–2 NK1 segments
     if include_nk1 and random.random() < 0.7:
-        segments.append(_build_nk1(patient))
+        nk1_count = random.randint(1, 2)
+        for _ in range(nk1_count):
+            segments.append(_build_nk1(patient))
+
+    # Add 0–3 allergies
+    al1_count = random.randint(0, 3)
+    for i in range(al1_count):
+        segments.append(_build_al1(i + 1))
 
     pv1 = _build_pv1(trigger)
     segments.append(pv1)

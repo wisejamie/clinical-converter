@@ -49,11 +49,27 @@ def convert_parsed_hl7_to_fhir(parsed: dict, debug: bool = False) -> dict:
         for o in parsed["observations"]
     ]
 
+    # Convert NK1 → RelatedPerson
+    if debug:
+        print("\n[DEBUG] Converting NK1 segments → FHIR RelatedPerson...")
+    related_persons_fhir = [
+        related_person_to_fhir(rp, patient_fhir["id"], debug=debug)
+        for rp in parsed.get("related_persons", [])
+    ]
+
+    # Convert AL1 → AllergyIntolerance
+    if debug:
+        print("\n[DEBUG] Converting AL1 segments → FHIR AllergyIntolerance...")
+    allergies_fhir = [
+        allergy_to_fhir(a, patient_fhir["id"], debug=debug)
+        for a in parsed.get("allergies", [])
+    ]
+
     # Construct bundle
     if debug:
         print("\n[DEBUG] Building final FHIR Bundle...")
 
-    bundle = make_fhir_bundle(patient_fhir, encounter_fhir, obs_fhir)
+    bundle = make_fhir_bundle(patient_fhir, encounter_fhir, obs_fhir, related_persons_fhir, allergies_fhir,)
 
     if debug:
         print("\n====== FHIR BUNDLE OUTPUT ======")
@@ -254,6 +270,97 @@ def obx_to_fhir(obx: Dict[str, Any],
 
     return resource
 
+# -------------------------------------------------------
+# RELATED PERSON (NK1)
+# -------------------------------------------------------
+
+def related_person_to_fhir(nk1: Dict[str, Any], patient_id: str, debug: bool = False) -> dict:
+    rp_id = f"rp-{uuid.uuid4()}"
+
+    if debug:
+        print(f"[DEBUG] Converting NK1 → RelatedPerson: id={rp_id}")
+        print("[DEBUG] NK1 fields:", nk1)
+
+    # Build RelatedPerson resource
+    resource = {
+        "resourceType": "RelatedPerson",
+        "id": rp_id,
+        "patient": {"reference": f"Patient/{patient_id}"},
+        "relationship": [],
+    }
+
+    # Name
+    if nk1["family"] or nk1["given"]:
+        resource["name"] = [{
+            "family": nk1["family"],
+            "given": [nk1["given"]] if nk1["given"] else []
+        }]
+    elif nk1["name_raw"]:
+        # fallback: raw name
+        resource["name"] = [{"text": nk1["name_raw"]}]
+
+    # Relationship code
+    if nk1["relationship_code"]:
+        resource["relationship"].append({
+            "coding": [{
+                "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                "code": nk1["relationship_code"]
+            }]
+        })
+
+    # Phone
+    if nk1["phone"]:
+        resource["telecom"] = [{
+            "system": "phone",
+            "value": nk1["phone"]
+        }]
+
+    if debug:
+        print("[DEBUG] RelatedPerson resource created:")
+        print(json.dumps(resource, indent=2))
+
+    return resource
+
+
+
+# -------------------------------------------------------
+# ALLERGY INTOLERANCE (AL1)
+# -------------------------------------------------------
+
+def allergy_to_fhir(al1: Dict[str, Any], patient_id: str, debug: bool = False) -> dict:
+    allergy_id = f"allergy-{uuid.uuid4()}"
+
+    if debug:
+        print(f"[DEBUG] Converting AL1 → AllergyIntolerance: id={allergy_id}")
+        print("[DEBUG] AL1 fields:", al1)
+
+    resource = {
+        "resourceType": "AllergyIntolerance",
+        "id": allergy_id,
+        "patient": {"reference": f"Patient/{patient_id}"},
+        "code": {
+            "text": al1["description"] or "Allergy"
+        },
+        "reaction": []
+    }
+
+    # Reaction with severity
+    reaction = {}
+    if al1["reaction"]:
+        reaction["description"] = al1["reaction"]
+
+    if al1["severity"]:
+        reaction["severity"] = al1["severity"]
+
+    if reaction:
+        resource["reaction"].append(reaction)
+
+    if debug:
+        print("[DEBUG] AllergyIntolerance resource created:")
+        print(json.dumps(resource, indent=2))
+
+    return resource
+
 
 # -------------------------------------------------------
 # BUNDLE
@@ -261,12 +368,16 @@ def obx_to_fhir(obx: Dict[str, Any],
 
 def make_fhir_bundle(patient: dict,
                      encounter: dict | None,
-                     observations: List[dict]) -> dict:
+                     observations: List[dict], 
+                     related_persons: List[dict],
+                     allergies: List[dict],) -> dict:
 
     entries = [{"resource": patient}]
     if encounter:
         entries.append({"resource": encounter})
     entries.extend({"resource": o} for o in observations)
+    entries.extend({"resource": rp} for rp in related_persons)
+    entries.extend({"resource": a} for a in allergies)
 
     return {
         "resourceType": "Bundle",
